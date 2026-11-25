@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Ship the finished front page for 25 November 2026.
 
-Entry program for make.fun's news-image-20261125 bounty. It copies
-the entry.png stored next to this file into $MAKEFUN_OUTPUT_DIR
-(or /output when that variable is unset, which is where the grader
-looks), then compares the copy's SHA-256 digest with the original
-so a truncated or corrupted write fails loudly. Standard library
-only, no network, no randomness: the grader's two runs write
-identical bytes.
+Entry program for make.fun's news-image-20261125 bounty. It takes
+the entry.png stored beside this file, writes it to
+$MAKEFUN_OUTPUT_DIR (or /output when that variable is unset, where
+the grader looks), and verifies the copy by comparing SHA-256
+digests, so a truncated write fails loudly. Standard library only,
+no network, no randomness: the grader's two runs write identical
+bytes.
 
 Try it locally with:
 
@@ -23,32 +23,35 @@ from pathlib import Path
 IMAGE = "entry.png"
 
 
-def digest(path):
+def sha256_of(path):
     """SHA-256 hex digest of a file, read in blocks."""
-    hasher = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for block in iter(lambda: handle.read(65536), b""):
-            hasher.update(block)
-    return hasher.hexdigest()
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(65536)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
 
 
-def main():
+def ship():
     here = Path(__file__).resolve().parent
-    source = here / IMAGE
-    expected = digest(source)
-    out_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
-    out_dir.mkdir(parents=True, exist_ok=True)
-    target = out_dir / IMAGE
-    shutil.copyfile(source, target)
-    actual = digest(target)
-    if actual != expected:
-        print(f"error: {IMAGE} copy mismatch: {actual} != {expected}",
+    src = here / IMAGE
+    want = sha256_of(src)
+    dest_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dst = dest_dir / IMAGE
+    shutil.copyfile(src, dst)
+    got = sha256_of(dst)
+    if got != want:
+        print(f"error: {IMAGE} copy mismatch: {got} != {want}",
               file=sys.stderr)
         return 1
-    size = target.stat().st_size
-    print(f"wrote {IMAGE} ({size} bytes, sha256 {actual}) to {out_dir}")
+    nbytes = dst.stat().st_size
+    print(f"wrote {IMAGE} ({nbytes} bytes, sha256 {got}) to {dest_dir}")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(ship())
